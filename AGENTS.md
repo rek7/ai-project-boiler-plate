@@ -217,7 +217,7 @@ Cover each layer for what only that layer can catch, and do not use one to fake 
   without credentials, rejected with the wrong role, the happy path, invalid input, and
   each error status the contract declares. This layer is why authorization bugs do not
   reach production.
-- **Integration**: against a real database from Compose (section 15) with migrations
+- **Integration**: against a real database from Compose (section 16) with migrations
   applied. Transactions, constraints, cascades, and the queries unit tests mock away.
   Never against a shared or remote database.
 - **End to end**: critical user journeys in a browser, against a real build. Sign up,
@@ -251,18 +251,48 @@ Across all of them:
   one corner of the app is a bug report waiting to happen.
 - Every interactive surface handles idle, loading, empty, error, and success. An empty
   state that says nothing and an error that swallows its cause are both defects.
-- Works at phone width. Not as a later pass: a component that can exceed the viewport
-  owns its own wrapping or scrolling, and never relies on a parent to hide overflow.
-- Test with hostile content, because real content is hostile: long unbroken strings,
-  missing values, the longest realistic value for every field. Truncate only when the
-  full value stays reachable.
-- Keyboard reachable, labeled, visible focus, sufficient contrast, semantic HTML before
-  ARIA. Automate the check in the browser tests so it is a gate and not an intention.
-- Respect reduced-motion and color-scheme preferences.
+- Everything shipped meets the mobile and accessibility gate in section 11.
 
 ---
 
-## 11. Copy
+## 11. Mobile and accessibility
+
+**A release criterion, not a later pass.** UI that works only at desktop width is not
+done, and it does not ship. Mobile is where most of the traffic is and where every layout
+bug surfaces first.
+
+- Every surface, without exception: landing, marketing, blog, docs, legal, auth,
+  dashboards, admin tools, settings, and error pages. Internal and admin screens are
+  included. "Nobody uses admin on a phone" stops being true the first time something
+  breaks while the person who can fix it is out.
+- The core check is mechanical, so automate it in the browser tests across the key routes
+  at the narrowest supported width: no horizontal document overflow, and every primary
+  action visible and reachable rather than hidden behind a fixed header or off-screen.
+  A rule that depends on someone remembering to look is a rule that decays.
+- A component that can exceed the viewport owns its own wrapping or scrolling. Never rely
+  on a parent to hide overflow, which fixes one page and breaks the next.
+- Test with hostile content, because real content is hostile: long unbroken strings such
+  as emails, URLs, hashes, and identifiers, the longest realistic value for every field,
+  missing values, and the loading and error states.
+- Truncate only when the full value stays reachable through a title, a copy control, or a
+  detail view. A value the user cannot recover is a value you deleted.
+- Fixed-width elements need explicit narrow-screen behavior: tables, code blocks, charts,
+  dialogs, tab bars, button groups, captcha widgets, and embeds. A third-party embed that
+  cannot work at phone width gets a fallback rather than permission to stretch the page.
+- Content-managed and user-generated HTML is hostile to layout. Guard the container so an
+  inline width cannot break the viewport.
+- Dense data does not default to a wide table on a phone. Show a compact summary with an
+  explicit path to the full record.
+- Check in more than one browser engine. Nested scroll containers and intrinsic-width
+  tables can pass in one and be unusable in another.
+
+Accessibility rides the same gate: keyboard reachable, visible focus, labeled inputs,
+semantic HTML before ARIA, sufficient contrast, meaningful alternative text, and automated
+checks on key routes. Respect reduced-motion and color-scheme preferences.
+
+---
+
+## 12. Copy
 
 Every user-visible string is product surface: pages, forms, helper text, empty states,
 errors, emails, docs, metadata, and machine-readable endpoints.
@@ -285,7 +315,7 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 12. Data
+## 13. Data
 
 - Schema changes go through reviewed migrations. No manual edits to a running database.
 - Destructive changes split across two deploys: stop using it, ship, then remove it.
@@ -304,7 +334,7 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 13. Security
+## 14. Security
 
 - Every route makes an explicit authorization decision, and a test proves it. There is no
   default-allow path.
@@ -318,7 +348,7 @@ Extend the list when review catches a new tic.
 - Set security headers and a content security policy. Cookies get the full set of flags,
   and cookie-authenticated state changes get CSRF protection.
 - Never invent cryptography. Use maintained libraries and pin their exact versions
-  (section 14).
+  (section 15).
 - Never log secrets or personal data. Redact in the logger configuration, not at each
   call site, because a call site will be forgotten.
 - User-facing errors never leak stack traces, queries, or internal paths. The detail goes
@@ -326,7 +356,7 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 14. Authentication and access
+## 15. Authentication and access
 
 Authentication is the last thing to hand-roll. Use a maintained library, pin it exactly,
 and spend your effort on authorization instead, which is the part no library can decide
@@ -367,7 +397,7 @@ scope the key so a prompt injection reaches only what that server legitimately n
 
 ---
 
-## 15. Containers
+## 16. Containers
 
 Everything runs in a container, from the first commit: local development, tests, CI, and
 production. The gap between a laptop and production is a whole category of bug, and
@@ -405,7 +435,7 @@ on their machine, and nobody debugs a failure that only happens in one environme
 
 ---
 
-## 16. Operations
+## 17. Operations
 
 - Structured logging with levels that mean something, and no stray print statements in
   application code.
@@ -423,12 +453,12 @@ on their machine, and nobody debugs a failure that only happens in one environme
   and the backup is a hope.
 - Alert on a missing success, not only on a reported failure. A job that quietly stops
   running is the common case.
-- Environments are reproducible from the repo (section 15). Topology, edge configuration,
+- Environments are reproducible from the repo (section 16). Topology, edge configuration,
   release steps, and scheduled jobs are committed; only the secret values live on the host.
 
 ---
 
-## 17. Discovery surfaces
+## 18. Discovery surfaces
 
 For anything with public pages, the machine-readable indexes are part of the app and
 change with it. Generate them from the same content the pages render. A hand-maintained
@@ -460,7 +490,7 @@ Rules:
 
 ---
 
-## 18. Dependencies and configuration
+## 19. Dependencies and configuration
 
 **Adopt before you build.** Reach for a maintained library or a framework feature first,
 and write custom code only for what is actually specific to this product. Auth, crypto,
@@ -493,7 +523,7 @@ Configuration:
 
 ---
 
-## 19. Automation
+## 20. Automation
 
 Run the gates before code leaves the machine, and again on a clean checkout. Both, because
 local hooks can be skipped and local machines lie.
@@ -517,7 +547,7 @@ letting the team learn to ignore red.
 
 ---
 
-## 20. Agent configuration
+## 21. Agent configuration
 
 The rules only work if every agent reads them, and the tooling belongs to the project
 rather than to one laptop.
@@ -536,7 +566,7 @@ rather than to one laptop.
 
 ---
 
-## 21. Definition of Done
+## 22. Definition of Done
 
 - [ ] Per-feature completeness review run before the gates, findings fixed or recorded
 - [ ] Lint, typecheck, and unit tests clean
@@ -545,7 +575,9 @@ rather than to one laptop.
 - [ ] New routes reachable and correctly authorized under both sessions and API keys
 - [ ] Integration tests pass if the data layer changed; browser tests if a flow changed
 - [ ] Copy reviewed for slop, no em dashes
-- [ ] Works at phone width, keyboard reachable, adequate contrast
+- [ ] Every changed surface checked at phone width with hostile content: no horizontal
+      overflow, nothing clipped, every primary action reachable
+- [ ] Keyboard reachable, focus visible, inputs labeled, contrast adequate
 - [ ] No new duplication: checked what already exists first
 - [ ] No secrets in the diff, example config updated
 - [ ] Migration reviewed and safe against production data
@@ -555,13 +587,13 @@ rather than to one laptop.
 
 ---
 
-## 22. Adapting this
+## 23. Adapting this
 
 1. Copy `AGENTS.md` into the new repo and symlink `CLAUDE.md` to it.
 2. Write `docs/spec.md` before writing code.
 3. Drop the sections that genuinely do not apply. A CLI has no responsive gate; an
    internal tool has no discovery surfaces.
-4. Keep sections 1, 2, 3, 6, 7, 9, 18, and 21 regardless of what you are building. Those are
+4. Keep sections 1, 2, 3, 6, 7, 9, 19, and 22 regardless of what you are building. Those are
    the ones that stop a project from rotting.
 5. Add project-specific rules to `docs/spec.md`, not here. This file is what is true
    across your projects; the spec is what is true about this one.

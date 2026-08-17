@@ -59,7 +59,11 @@ Project-specific rules go in the spec, never in `AGENTS.md`.
 - **Five test layers.** Unit, handler, integration, end-to-end, and post-deploy smoke,
   with the job each one does and the rules that keep them from going flaky.
 - **Interface.** One component library, one forms approach, one fetching approach, all
-  five states handled, phone width and accessibility as gates rather than intentions.
+  five states handled.
+- **Mobile as a release criterion.** Every surface including admin and internal tools,
+  checked at phone width with hostile content, no horizontal overflow, every primary
+  action reachable, and the check automated in the browser tests. Accessibility rides the
+  same gate.
 - **Copy.** No slop, no em dashes, and an AST-based test that makes it a build gate.
 - **Data.** Reviewed migrations, two-step destructive changes, constraints in the
   database, transactional audit records, backfills as committed code.
