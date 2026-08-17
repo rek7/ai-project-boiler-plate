@@ -45,6 +45,10 @@ Project-specific rules go in the spec, never in `AGENTS.md`.
 
 - **The Loop.** Lint, typecheck, tests, drift checks after every change. Fix and re-run
   until clean. The rule the others exist to support.
+- **Completeness review before the gates.** One subagent per feature touched, each reading
+  the code and hunting what is stubbed, faked, hardcoded, half-wired, or swallowed, with
+  the findings fixed before anything runs. Gates prove code is consistent, not finished,
+  and green output ends a task early if it arrives first.
 - **Structure and duplication.** What belongs in a shared package, when code earns the
   move, one definition per concept, rule of three for extraction.
 - **TypeScript.** Strict, no `any`, no ignores, types derived from schemas.

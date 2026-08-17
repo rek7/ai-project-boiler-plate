@@ -23,7 +23,7 @@ not the history, not the pitch. What exists right now.
 It holds:
 
 - What the project does and who uses it
-- The stack actually in use, and anything chosen against the defaults in section 3
+- The stack actually in use, and anything chosen against the defaults in section 4
 - The shape of the system: services, packages, boundaries, what talks to what
 - The data model and the invariants the schema cannot express on its own
 - Public surfaces: routes, APIs, jobs, integrations
@@ -54,10 +54,11 @@ Every task, no exceptions.
 
 1. Write or change the code.
 2. Write or update tests for what you touched, in the same change.
-3. Run the gates: lint, typecheck, unit tests, and any generated-artifact drift check.
-4. If a gate fails, fix the root cause and run again. Do not skip, suppress, or defer.
-5. Repeat until clean.
-6. Update `docs/spec.md` if the shape changed.
+3. Run the completeness review (section 3) and fix what it finds.
+4. Run the gates: lint, typecheck, unit tests, and any generated-artifact drift check.
+5. If a gate fails, fix the root cause and run again. Do not skip, suppress, or defer.
+6. Repeat until clean.
+7. Update `docs/spec.md` if the shape changed.
 
 Run the build when the change touches runtime behavior, package exports, env wiring, or
 deployment. Run the browser tests when it touches a user flow.
@@ -67,7 +68,51 @@ is the one unrecoverable mistake in this file.
 
 ---
 
-## 3. Defaults
+## 3. Completeness review
+
+**Before the gates, not after.** Fan out one subagent per feature or surface the change
+touched, each reviewing that feature on its own against what it is supposed to do, and fix
+what they find. Then run the gates.
+
+The order is the point. Deterministic gates prove code is internally consistent, not that
+it is finished. Lint, typecheck, and tests all pass happily on a function that returns a
+hardcoded value, a handler that swallows its error, a component wired to a mock, a branch
+guarded by a flag nobody sets, and a migration with no code path that uses it. Running
+gates on incomplete work only proves the incomplete work is well typed. Reviewing after
+the gates is worse still, because green output is the strongest available signal that a
+task is done and it will end the task early.
+
+One reviewer per feature, not one pass over the whole diff. A single reviewer holding a
+large change regresses to skimming, and skimming is exactly the failure mode this step
+exists to catch. Small scope is what makes actually reading the code possible.
+
+Each reviewer reads the code, not the diff summary, the commit message, or the plan that
+produced it, and answers:
+
+- Does this feature do what it claims, end to end, for a real user rather than a test?
+- What is stubbed, faked, hardcoded, mocked, or half-wired?
+- Which error and edge paths are swallowed, unhandled, or silently ignored?
+- What did the task say it would do that is not there?
+- What did the implementation quietly narrow or skip to get to green?
+
+Common findings worth hunting explicitly: leftover TODO and FIXME markers on a shipped
+path, functions returning fixtures, empty catch blocks, debugging output, commented-out
+code, unreachable branches, happy-path-only handling, configuration read but never used,
+error states that render nothing, tests that assert nothing meaningful, and any place the
+implementation diverged from the interface it advertises.
+
+Then:
+
+- Fix what the reviewers find, before the gates run.
+- A finding you choose not to fix gets recorded in `docs/spec.md` as deliberately not
+  built, with the reason. A known gap is a decision; an unknown gap is a defect.
+- A reviewer that reports "looks good" with no specifics did not look. Send it back.
+- Reviewers report findings; they do not grade their own work. The agent that wrote the
+  feature is the worst judge of whether it is complete.
+
+---
+
+## 4. Defaults
 
 Starting points, not requirements. Swap any of them for a good reason, keep the role
 filled, and record the swap in `docs/spec.md`.
@@ -91,7 +136,7 @@ The gates in section 2 and the directives below survive any swap. The table does
 
 ---
 
-## 4. Structure and duplication
+## 5. Structure and duplication
 
 - Shared packages hold runtime-neutral code. Product concepts live in the app that owns
   them. A package named after a feature is a boundary violation waiting to spread.
@@ -109,7 +154,7 @@ The gates in section 2 and the directives below survive any swap. The table does
 
 ---
 
-## 5. TypeScript
+## 6. TypeScript
 
 - Strict mode everywhere, including `noUncheckedIndexedAccess`.
 - No `any`. Use `unknown`, a generic, a type guard, or a schema-inferred type.
@@ -124,7 +169,7 @@ The gates in section 2 and the directives below survive any swap. The table does
 
 ---
 
-## 6. Validation
+## 7. Validation
 
 Parse at every boundary where data enters the process, and let the parsed type flow
 inward. Inside the boundary, trust your types; at the boundary, trust nothing.
@@ -141,7 +186,7 @@ webhook payloads after signature checks, queue messages, files, and database JSO
 
 ---
 
-## 7. API contract, spec, and docs
+## 8. API contract, spec, and docs
 
 The contract is the source of truth. Types, runtime validation, the client, the server
 handlers, and the published spec all derive from it.
@@ -162,7 +207,7 @@ handlers, and the published spec all derive from it.
 
 ---
 
-## 8. Testing
+## 9. Testing
 
 Cover each layer for what only that layer can catch, and do not use one to fake another.
 
@@ -172,7 +217,7 @@ Cover each layer for what only that layer can catch, and do not use one to fake 
   without credentials, rejected with the wrong role, the happy path, invalid input, and
   each error status the contract declares. This layer is why authorization bugs do not
   reach production.
-- **Integration**: against a real database from Compose (section 14) with migrations
+- **Integration**: against a real database from Compose (section 15) with migrations
   applied. Transactions, constraints, cascades, and the queries unit tests mock away.
   Never against a shared or remote database.
 - **End to end**: critical user journeys in a browser, against a real build. Sign up,
@@ -196,7 +241,7 @@ Across all of them:
 
 ---
 
-## 9. Interface
+## 10. Interface
 
 - One component library per project, used for everything. Mixing two produces two of
   every primitive, two focus styles, and a design that never converges.
@@ -217,7 +262,7 @@ Across all of them:
 
 ---
 
-## 10. Copy
+## 11. Copy
 
 Every user-visible string is product surface: pages, forms, helper text, empty states,
 errors, emails, docs, metadata, and machine-readable endpoints.
@@ -240,7 +285,7 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 11. Data
+## 12. Data
 
 - Schema changes go through reviewed migrations. No manual edits to a running database.
 - Destructive changes split across two deploys: stop using it, ship, then remove it.
@@ -259,13 +304,13 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 12. Security
+## 13. Security
 
 - Every route makes an explicit authorization decision, and a test proves it. There is no
   default-allow path.
 - Authorize against the resource, not only the role. "Is this an admin" and "does this
   user own this record" are different questions and both get asked.
-- Validate input and shape output at the boundary (section 6).
+- Validate input and shape output at the boundary (section 7).
 - Secrets live in the environment and nowhere else. Only an example file is committed,
   with every key present and every value blank. Scan for leaked secrets automatically.
 - Rate limit authentication, password reset, signup, and anything expensive, by both
@@ -273,7 +318,7 @@ Extend the list when review catches a new tic.
 - Set security headers and a content security policy. Cookies get the full set of flags,
   and cookie-authenticated state changes get CSRF protection.
 - Never invent cryptography. Use maintained libraries and pin their exact versions
-  (section 13).
+  (section 14).
 - Never log secrets or personal data. Redact in the logger configuration, not at each
   call site, because a call site will be forgotten.
 - User-facing errors never leak stack traces, queries, or internal paths. The detail goes
@@ -281,7 +326,7 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 13. Authentication and access
+## 14. Authentication and access
 
 Authentication is the last thing to hand-roll. Use a maintained library, pin it exactly,
 and spend your effort on authorization instead, which is the part no library can decide
@@ -322,7 +367,7 @@ scope the key so a prompt injection reaches only what that server legitimately n
 
 ---
 
-## 14. Containers
+## 15. Containers
 
 Everything runs in a container, from the first commit: local development, tests, CI, and
 production. The gap between a laptop and production is a whole category of bug, and
@@ -360,7 +405,7 @@ on their machine, and nobody debugs a failure that only happens in one environme
 
 ---
 
-## 15. Operations
+## 16. Operations
 
 - Structured logging with levels that mean something, and no stray print statements in
   application code.
@@ -378,12 +423,12 @@ on their machine, and nobody debugs a failure that only happens in one environme
   and the backup is a hope.
 - Alert on a missing success, not only on a reported failure. A job that quietly stops
   running is the common case.
-- Environments are reproducible from the repo (section 14). Topology, edge configuration,
+- Environments are reproducible from the repo (section 15). Topology, edge configuration,
   release steps, and scheduled jobs are committed; only the secret values live on the host.
 
 ---
 
-## 16. Discovery surfaces
+## 17. Discovery surfaces
 
 For anything with public pages, the machine-readable indexes are part of the app and
 change with it. Generate them from the same content the pages render. A hand-maintained
@@ -415,7 +460,7 @@ Rules:
 
 ---
 
-## 17. Dependencies and configuration
+## 18. Dependencies and configuration
 
 **Adopt before you build.** Reach for a maintained library or a framework feature first,
 and write custom code only for what is actually specific to this product. Auth, crypto,
@@ -431,7 +476,7 @@ Resolve the tension by choosing well rather than by choosing less.
 - Check what is already installed before adding anything. Three date libraries is a
   review failure.
 - Wrap each external client in one module so replacing it is a contained change
-  (section 4).
+  (section 5).
 - Pin exactly anything touching auth, crypto, payments, or code generation.
 - Automate upgrade pull requests and let the gates decide. Removing a dependency is a
   valuable change.
@@ -448,7 +493,7 @@ Configuration:
 
 ---
 
-## 18. Automation
+## 19. Automation
 
 Run the gates before code leaves the machine, and again on a clean checkout. Both, because
 local hooks can be skipped and local machines lie.
@@ -472,7 +517,7 @@ letting the team learn to ignore red.
 
 ---
 
-## 19. Agent configuration
+## 20. Agent configuration
 
 The rules only work if every agent reads them, and the tooling belongs to the project
 rather than to one laptop.
@@ -491,8 +536,9 @@ rather than to one laptop.
 
 ---
 
-## 20. Definition of Done
+## 21. Definition of Done
 
+- [ ] Per-feature completeness review run before the gates, findings fixed or recorded
 - [ ] Lint, typecheck, and unit tests clean
 - [ ] Generated artifacts regenerated and committed
 - [ ] New code tested, including auth and error paths for new routes
@@ -509,13 +555,13 @@ rather than to one laptop.
 
 ---
 
-## 21. Adapting this
+## 22. Adapting this
 
 1. Copy `AGENTS.md` into the new repo and symlink `CLAUDE.md` to it.
 2. Write `docs/spec.md` before writing code.
 3. Drop the sections that genuinely do not apply. A CLI has no responsive gate; an
    internal tool has no discovery surfaces.
-4. Keep sections 1, 2, 5, 6, 8, 17, and 20 regardless of what you are building. Those are
+4. Keep sections 1, 2, 3, 6, 7, 9, 18, and 21 regardless of what you are building. Those are
    the ones that stop a project from rotting.
 5. Add project-specific rules to `docs/spec.md`, not here. This file is what is true
    across your projects; the spec is what is true about this one.
