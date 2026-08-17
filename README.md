@@ -61,6 +61,11 @@ Project-specific rules go in the spec, never in `AGENTS.md`.
   database, transactional audit records, backfills as committed code.
 - **Security.** Explicit authorization per route proven by tests, secret handling, rate
   limits, headers, errors that do not leak internals.
+- **Auth and access.** Never hand-rolled. Sessions and scoped API keys from the first
+  release, both resolving to one authorization decision, so MCP servers, CI, and
+  integrations are ordinary clients rather than side doors.
+- **Adopt before you build.** Reach for the framework's answer, then a maintained
+  library, then your own code, and write down which one you picked and why.
 - **Operations.** Structured logs, request IDs, a health endpoint, and backups that are
   off-host, checksummed, replicated, and actually restore-drilled.
 - **Discovery surfaces.** `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt`, feeds,

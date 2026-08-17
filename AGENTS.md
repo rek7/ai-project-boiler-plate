@@ -79,6 +79,7 @@ filled, and record the swap in `docs/spec.md`.
 | Package manager and tasks | pnpm workspaces, Turborepo |
 | Web framework | Next.js App Router |
 | API contract | ts-rest, contracts built from the validation schemas |
+| Auth | Better Auth for sessions, plus first-party hashed API keys |
 | Database | PostgreSQL via Prisma |
 | Component library | shadcn/ui in a shared package |
 | Tests | Vitest for unit and integration, Playwright for browser |
@@ -270,9 +271,8 @@ Extend the list when review catches a new tic.
   address and account.
 - Set security headers and a content security policy. Cookies get the full set of flags,
   and cookie-authenticated state changes get CSRF protection.
-- Use maintained libraries for anything cryptographic and pin their exact versions, so a
-  patch release cannot silently change your parameters.
-- Store API tokens hashed and show them once.
+- Never invent cryptography. Use maintained libraries and pin their exact versions
+  (section 13).
 - Never log secrets or personal data. Redact in the logger configuration, not at each
   call site, because a call site will be forgotten.
 - User-facing errors never leak stack traces, queries, or internal paths. The detail goes
@@ -280,7 +280,48 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 13. Operations
+## 13. Authentication and access
+
+Authentication is the last thing to hand-roll. Use a maintained library, pin it exactly,
+and spend your effort on authorization instead, which is the part no library can decide
+for you.
+
+- Adopt an auth library rather than assembling sessions, password hashing, verification,
+  and reset flows yourself. Every one of those has a well-known way to get subtly wrong,
+  and a library that thousands of projects audit is a better bet than your afternoon.
+- When a library bootstraps schema, generate it once, then own it. Never re-run a
+  generator against a live schema; it will overwrite the relations, indexes, and models
+  you added. On upgrade, generate to a scratch file, diff, and apply changes deliberately.
+- Pin the exact version. A patch release that changes hashing parameters silently
+  invalidates every stored credential.
+
+**Two credential types, from the first release.** Interactive sessions for browsers, and
+API keys for everything programmatic: MCP servers, CI jobs, scripts, integrations, and
+anyone building against your API. Adding the second type later means revisiting every
+authorization check in the codebase, so build both in from the start even if only one has
+a consumer today.
+
+- API keys are stored hashed, shown once at creation, scoped to the narrowest set of
+  permissions that works, revocable immediately, and attributable to a principal.
+- Support expiry and rotation. A key that never expires is a key that outlives the
+  contractor who created it.
+- Rate limit and audit keys independently of sessions. Their traffic pattern is different
+  and so is the blast radius.
+- Both credential types resolve to the same caller identity and flow through the same
+  authorization decision. One place decides what a caller may do, so a permission added
+  for the UI cannot silently open the API.
+- The differences that remain are transport-level: CSRF protection applies to cookies,
+  not to bearer credentials.
+
+**MCP servers are ordinary API clients.** An MCP server authenticates with a scoped key
+over the documented API and gets no privileged path, no shared secret, and no direct
+database access. If a tool it exposes needs a capability the API does not have, add the
+endpoint and the permission rather than a side door. Treat tool inputs as untrusted, and
+scope the key so a prompt injection reaches only what that server legitimately needs.
+
+---
+
+## 14. Operations
 
 - Structured logging with levels that mean something, and no stray print statements in
   application code.
@@ -303,7 +344,7 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 14. Discovery surfaces
+## 15. Discovery surfaces
 
 For anything with public pages, the machine-readable indexes are part of the app and
 change with it. Generate them from the same content the pages render. A hand-maintained
@@ -335,21 +376,40 @@ Rules:
 
 ---
 
-## 15. Configuration and dependencies
+## 16. Dependencies and configuration
 
-- Configuration is environment variables, validated at startup. Feature flags are a
-  runtime store you can change without a deploy. They are not the same thing.
-- No environment branching inside business logic. Inject the difference instead.
-- The example env file stays in sync with the schema, ideally enforced by a test.
-- Every dependency is a liability. Check what is already installed before adding another;
-  three date libraries is a review failure.
+**Adopt before you build.** Reach for a maintained library or a framework feature first,
+and write custom code only for what is actually specific to this product. Auth, crypto,
+payments, date handling, validation, rate limiting, migrations, retries, parsing, and
+scheduling are all solved problems with known edge cases, and the version you write in an
+afternoon has the same edge cases with none of the fixes. Use the framework's answer
+before adding a library, and a library before writing your own.
+
+The counterweight, which is real: every dependency is also a liability you now maintain.
+Resolve the tension by choosing well rather than by choosing less.
+
+- Prefer widely used, actively maintained, well-typed packages with a clear owner.
+- Check what is already installed before adding anything. Three date libraries is a
+  review failure.
+- Wrap each external client in one module so replacing it is a contained change
+  (section 4).
 - Pin exactly anything touching auth, crypto, payments, or code generation.
 - Automate upgrade pull requests and let the gates decide. Removing a dependency is a
   valuable change.
+- Write it yourself when the requirement is genuinely yours, when the library is
+  unmaintained or heavier than the problem, or when you would spend more time fighting its
+  model than solving the task. Record that call in `docs/spec.md`.
+
+Configuration:
+
+- Environment variables, validated at startup. Feature flags are a runtime store you can
+  change without a deploy. They are not the same thing.
+- No environment branching inside business logic. Inject the difference instead.
+- The example env file stays in sync with the schema, ideally enforced by a test.
 
 ---
 
-## 16. Automation
+## 17. Automation
 
 Run the gates before code leaves the machine, and again on a clean checkout. Both, because
 local hooks can be skipped and local machines lie.
@@ -373,7 +433,7 @@ letting the team learn to ignore red.
 
 ---
 
-## 17. Agent configuration
+## 18. Agent configuration
 
 The rules only work if every agent reads them, and the tooling belongs to the project
 rather than to one laptop.
@@ -392,11 +452,12 @@ rather than to one laptop.
 
 ---
 
-## 18. Definition of Done
+## 19. Definition of Done
 
 - [ ] Lint, typecheck, and unit tests clean
 - [ ] Generated artifacts regenerated and committed
 - [ ] New code tested, including auth and error paths for new routes
+- [ ] New routes reachable and correctly authorized under both sessions and API keys
 - [ ] Integration tests pass if the data layer changed; browser tests if a flow changed
 - [ ] Copy reviewed for slop, no em dashes
 - [ ] Works at phone width, keyboard reachable, adequate contrast
@@ -408,13 +469,13 @@ rather than to one laptop.
 
 ---
 
-## 19. Adapting this
+## 20. Adapting this
 
 1. Copy `AGENTS.md` into the new repo and symlink `CLAUDE.md` to it.
 2. Write `docs/spec.md` before writing code.
 3. Drop the sections that genuinely do not apply. A CLI has no responsive gate; an
    internal tool has no discovery surfaces.
-4. Keep sections 1, 2, 5, 6, 8, and 18 regardless of what you are building. Those are the
-   ones that stop a project from rotting.
+4. Keep sections 1, 2, 5, 6, 8, 16, and 19 regardless of what you are building. Those are
+   the ones that stop a project from rotting.
 5. Add project-specific rules to `docs/spec.md`, not here. This file is what is true
    across your projects; the spec is what is true about this one.
