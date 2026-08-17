@@ -84,6 +84,7 @@ filled, and record the swap in `docs/spec.md`.
 | Component library | shadcn/ui in a shared package |
 | Tests | Vitest for unit and integration, Playwright for browser |
 | Lint and format | ESLint type-checked config, Prettier |
+| Runtime and environments | Docker, one Compose file per environment |
 | Logging | structured JSON |
 
 The gates in section 2 and the directives below survive any swap. The table does not.
@@ -171,9 +172,9 @@ Cover each layer for what only that layer can catch, and do not use one to fake 
   without credentials, rejected with the wrong role, the happy path, invalid input, and
   each error status the contract declares. This layer is why authorization bugs do not
   reach production.
-- **Integration**: against a real database with migrations applied. Transactions,
-  constraints, cascades, and the queries unit tests mock away. Never against a shared or
-  remote database.
+- **Integration**: against a real database from Compose (section 14) with migrations
+  applied. Transactions, constraints, cascades, and the queries unit tests mock away.
+  Never against a shared or remote database.
 - **End to end**: critical user journeys in a browser, against a real build. Sign up,
   sign in, the thing the product exists to do, payment, one admin flow.
 - **Smoke**: against the deployed URL after every release, fast, read-only, and safe to
@@ -321,7 +322,45 @@ scope the key so a prompt injection reaches only what that server legitimately n
 
 ---
 
-## 14. Operations
+## 14. Containers
+
+Everything runs in a container, from the first commit: local development, tests, CI, and
+production. The gap between a laptop and production is a whole category of bug, and
+containers delete it by construction rather than by discipline. Nobody installs a database
+on their machine, and nobody debugs a failure that only happens in one environment.
+
+- One Dockerfile per deployable. Multi-stage, so the runtime image carries the built
+  artifact and its runtime dependencies and nothing else. Run as a non-root user.
+- Compose describes the topology, one file per environment: development with source
+  mounted and hot reload, test with the dependencies integration tests need and nothing
+  persistent, production with the real thing. Same service names and shape across all
+  three, so what you debug locally is what runs in production.
+- Every dependency the app talks to comes from Compose: database, cache, search, queue,
+  object storage. If a test needs a remote or shared service to pass, it is not a test you
+  can trust.
+- Build the image once in CI, tag it with the commit, and promote that exact artifact
+  through environments. Only the env file changes. An image rebuilt at deploy time is not
+  the image you tested.
+- Pin base images by digest rather than a floating tag, and rebuild on a schedule so
+  patches land deliberately instead of by surprise.
+- Never bake secrets into an image. Build arguments persist in the layer history. Secrets
+  arrive at runtime from files the host owns.
+- The build must not need production credentials or network access to succeed. If a
+  framework evaluates code at build time and demands a connection string, give the build
+  stage a placeholder.
+- Declare health checks and startup dependencies in Compose so ordering is deterministic
+  rather than a race that usually wins.
+- Persistent data lives in named volumes. A container is disposable and should be treated
+  as such; if deleting one loses data, the topology is wrong.
+- Keep the build context small and order layers so dependency installation caches. A slow
+  image build is a gate people learn to skip.
+- Getting a working environment is one command against a fresh clone. Onboarding that
+  needs a page of manual steps is onboarding that rots, and the first person to hit a
+  stale step usually fixes it locally and tells nobody.
+
+---
+
+## 15. Operations
 
 - Structured logging with levels that mean something, and no stray print statements in
   application code.
@@ -339,12 +378,12 @@ scope the key so a prompt injection reaches only what that server legitimately n
   and the backup is a hope.
 - Alert on a missing success, not only on a reported failure. A job that quietly stops
   running is the common case.
-- Environments are reproducible from the repo. Topology, edge configuration, release
-  steps, and scheduled jobs are committed; only the secret values live on the host.
+- Environments are reproducible from the repo (section 14). Topology, edge configuration,
+  release steps, and scheduled jobs are committed; only the secret values live on the host.
 
 ---
 
-## 15. Discovery surfaces
+## 16. Discovery surfaces
 
 For anything with public pages, the machine-readable indexes are part of the app and
 change with it. Generate them from the same content the pages render. A hand-maintained
@@ -376,7 +415,7 @@ Rules:
 
 ---
 
-## 16. Dependencies and configuration
+## 17. Dependencies and configuration
 
 **Adopt before you build.** Reach for a maintained library or a framework feature first,
 and write custom code only for what is actually specific to this product. Auth, crypto,
@@ -409,7 +448,7 @@ Configuration:
 
 ---
 
-## 17. Automation
+## 18. Automation
 
 Run the gates before code leaves the machine, and again on a clean checkout. Both, because
 local hooks can be skipped and local machines lie.
@@ -433,7 +472,7 @@ letting the team learn to ignore red.
 
 ---
 
-## 18. Agent configuration
+## 19. Agent configuration
 
 The rules only work if every agent reads them, and the tooling belongs to the project
 rather than to one laptop.
@@ -452,7 +491,7 @@ rather than to one laptop.
 
 ---
 
-## 19. Definition of Done
+## 20. Definition of Done
 
 - [ ] Lint, typecheck, and unit tests clean
 - [ ] Generated artifacts regenerated and committed
@@ -464,18 +503,19 @@ rather than to one laptop.
 - [ ] No new duplication: checked what already exists first
 - [ ] No secrets in the diff, example config updated
 - [ ] Migration reviewed and safe against production data
+- [ ] Still builds and comes up from a clean clone with one Compose command
 - [ ] Public indexes still correct, with a test proving private content stays out
 - [ ] `docs/spec.md` updated if the shape, the data model, or a decision changed
 
 ---
 
-## 20. Adapting this
+## 21. Adapting this
 
 1. Copy `AGENTS.md` into the new repo and symlink `CLAUDE.md` to it.
 2. Write `docs/spec.md` before writing code.
 3. Drop the sections that genuinely do not apply. A CLI has no responsive gate; an
    internal tool has no discovery surfaces.
-4. Keep sections 1, 2, 5, 6, 8, 16, and 19 regardless of what you are building. Those are
+4. Keep sections 1, 2, 5, 6, 8, 17, and 20 regardless of what you are building. Those are
    the ones that stop a project from rotting.
 5. Add project-specific rules to `docs/spec.md`, not here. This file is what is true
    across your projects; the spec is what is true about this one.

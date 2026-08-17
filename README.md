@@ -66,6 +66,9 @@ Project-specific rules go in the spec, never in `AGENTS.md`.
   integrations are ordinary clients rather than side doors.
 - **Adopt before you build.** Reach for the framework's answer, then a maintained
   library, then your own code, and write down which one you picked and why.
+- **Containers.** Docker everywhere from the first commit, one Compose file per
+  environment, dependencies from Compose rather than from a laptop, one image built in CI
+  and promoted unchanged, and a fresh clone running on one command.
 - **Operations.** Structured logs, request IDs, a health endpoint, and backups that are
   off-host, checksummed, replicated, and actually restore-drilled.
 - **Discovery surfaces.** `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt`, feeds,
