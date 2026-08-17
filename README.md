@@ -64,6 +64,10 @@ Project-specific rules go in the spec, never in `AGENTS.md`.
   checked at phone width with hostile content, no horizontal overflow, every primary
   action reachable, and the check automated in the browser tests. Accessibility rides the
   same gate.
+- **Visual verification.** Headless Chrome renders every page at phone and desktop width
+  after the build and again after the deploy, full page, console errors and failed
+  requests treated as failures, screenshots kept per commit and diffed. Assertions only
+  catch what someone thought to assert.
 - **Copy.** No slop, no em dashes, and an AST-based test that makes it a build gate.
 - **Data.** Reviewed migrations, two-step destructive changes, constraints in the
   database, transactional audit records, backfills as committed code.

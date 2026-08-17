@@ -58,10 +58,12 @@ Every task, no exceptions.
 4. Run the gates: lint, typecheck, unit tests, and any generated-artifact drift check.
 5. If a gate fails, fix the root cause and run again. Do not skip, suppress, or defer.
 6. Repeat until clean.
-7. Update `docs/spec.md` if the shape changed.
+7. Render the changed pages and look at the screenshots (section 12).
+8. Update `docs/spec.md` if the shape changed.
 
 Run the build when the change touches runtime behavior, package exports, env wiring, or
-deployment. Run the browser tests when it touches a user flow.
+deployment. Run the browser tests when it touches a user flow. Render again against the
+live URL after the deploy.
 
 A task with failing lint, type errors, or broken tests is unfinished. Reporting it as done
 is the one unrecoverable mistake in this file.
@@ -217,7 +219,7 @@ Cover each layer for what only that layer can catch, and do not use one to fake 
   without credentials, rejected with the wrong role, the happy path, invalid input, and
   each error status the contract declares. This layer is why authorization bugs do not
   reach production.
-- **Integration**: against a real database from Compose (section 16) with migrations
+- **Integration**: against a real database from Compose (section 17) with migrations
   applied. Transactions, constraints, cascades, and the queries unit tests mock away.
   Never against a shared or remote database.
 - **End to end**: critical user journeys in a browser, against a real build. Sign up,
@@ -292,7 +294,41 @@ checks on key routes. Respect reduced-motion and color-scheme preferences.
 
 ---
 
-## 12. Copy
+## 12. Visual verification
+
+**Render the pages in a real browser and look at them.** Twice: after the build, against
+the app running locally, and again after the deploy, against the live URL.
+
+Automated assertions only catch what someone thought to assert. A route can return 200
+with valid HTML and still render an empty container, an overlapping header, unreadable
+contrast, a component stuck in its loading state, or a console full of errors, and every
+gate in this file stays green while it happens. Rendering is the only step that checks
+what a person actually sees.
+
+- Drive headless Chrome, not a DOM simulator. The bugs you are looking for live in the
+  layout engine, and a simulated DOM cannot have them.
+- Capture every page at a phone width and a desktop width, full page rather than just the
+  fold. This is also the evidence section 11 asks for.
+- Enumerate the routes from the same inventory that feeds the sitemap (section 19) so a
+  new page is captured automatically and nobody maintains a second list that drifts.
+- Cover the states that matter, not only the happy one: signed out and signed in, empty
+  and populated, and the error page. An empty state is where broken rendering hides.
+- Settle before capturing: fonts loaded, images decoded, network quiet, animations
+  disabled. An unsettled screenshot produces a diff that means nothing.
+- Collect console errors, unhandled rejections, and failed network requests during the
+  run and fail on them. It is the cheapest real bug detector available and it catches
+  things no assertion was written for.
+- Keep the images as artifacts tied to the commit and diff them against the previous run.
+  The diff is the value: it turns "did I break a layout somewhere else" into a question
+  answerable in seconds rather than a hope.
+- Run it again after deploy, because the deployed environment is not the build: different
+  environment variables, a CDN in front, real data, real auth, real fonts.
+- Look at the output. An agent reads the images directly; a person scans the diff. A
+  screenshot nobody opens is a file, not a check.
+
+---
+
+## 13. Copy
 
 Every user-visible string is product surface: pages, forms, helper text, empty states,
 errors, emails, docs, metadata, and machine-readable endpoints.
@@ -315,7 +351,7 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 13. Data
+## 14. Data
 
 - Schema changes go through reviewed migrations. No manual edits to a running database.
 - Destructive changes split across two deploys: stop using it, ship, then remove it.
@@ -334,7 +370,7 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 14. Security
+## 15. Security
 
 - Every route makes an explicit authorization decision, and a test proves it. There is no
   default-allow path.
@@ -348,7 +384,7 @@ Extend the list when review catches a new tic.
 - Set security headers and a content security policy. Cookies get the full set of flags,
   and cookie-authenticated state changes get CSRF protection.
 - Never invent cryptography. Use maintained libraries and pin their exact versions
-  (section 15).
+  (section 16).
 - Never log secrets or personal data. Redact in the logger configuration, not at each
   call site, because a call site will be forgotten.
 - User-facing errors never leak stack traces, queries, or internal paths. The detail goes
@@ -356,7 +392,7 @@ Extend the list when review catches a new tic.
 
 ---
 
-## 15. Authentication and access
+## 16. Authentication and access
 
 Authentication is the last thing to hand-roll. Use a maintained library, pin it exactly,
 and spend your effort on authorization instead, which is the part no library can decide
@@ -397,7 +433,7 @@ scope the key so a prompt injection reaches only what that server legitimately n
 
 ---
 
-## 16. Containers
+## 17. Containers
 
 Everything runs in a container, from the first commit: local development, tests, CI, and
 production. The gap between a laptop and production is a whole category of bug, and
@@ -435,7 +471,7 @@ on their machine, and nobody debugs a failure that only happens in one environme
 
 ---
 
-## 17. Operations
+## 18. Operations
 
 - Structured logging with levels that mean something, and no stray print statements in
   application code.
@@ -453,12 +489,12 @@ on their machine, and nobody debugs a failure that only happens in one environme
   and the backup is a hope.
 - Alert on a missing success, not only on a reported failure. A job that quietly stops
   running is the common case.
-- Environments are reproducible from the repo (section 16). Topology, edge configuration,
+- Environments are reproducible from the repo (section 17). Topology, edge configuration,
   release steps, and scheduled jobs are committed; only the secret values live on the host.
 
 ---
 
-## 18. Discovery surfaces
+## 19. Discovery surfaces
 
 For anything with public pages, the machine-readable indexes are part of the app and
 change with it. Generate them from the same content the pages render. A hand-maintained
@@ -490,7 +526,7 @@ Rules:
 
 ---
 
-## 19. Dependencies and configuration
+## 20. Dependencies and configuration
 
 **Adopt before you build.** Reach for a maintained library or a framework feature first,
 and write custom code only for what is actually specific to this product. Auth, crypto,
@@ -523,7 +559,7 @@ Configuration:
 
 ---
 
-## 20. Automation
+## 21. Automation
 
 Run the gates before code leaves the machine, and again on a clean checkout. Both, because
 local hooks can be skipped and local machines lie.
@@ -540,14 +576,15 @@ local hooks can be skipped and local machines lie.
   tag runs with your credentials.
 - Serialize jobs that touch production so two releases cannot interleave.
 - Untrusted code from forks never runs where production credentials live.
-- Deploys migrate, release, smoke test, and keep the previous release ready to roll back.
+- Deploys migrate, release, smoke test, render the pages against the live URL
+  (section 12), and keep the previous release ready to roll back.
 
 If a gate gets slow enough that people want to bypass it, move work to CI rather than
 letting the team learn to ignore red.
 
 ---
 
-## 21. Agent configuration
+## 22. Agent configuration
 
 The rules only work if every agent reads them, and the tooling belongs to the project
 rather than to one laptop.
@@ -566,7 +603,7 @@ rather than to one laptop.
 
 ---
 
-## 22. Definition of Done
+## 23. Definition of Done
 
 - [ ] Per-feature completeness review run before the gates, findings fixed or recorded
 - [ ] Lint, typecheck, and unit tests clean
@@ -578,6 +615,9 @@ rather than to one laptop.
 - [ ] Every changed surface checked at phone width with hostile content: no horizontal
       overflow, nothing clipped, every primary action reachable
 - [ ] Keyboard reachable, focus visible, inputs labeled, contrast adequate
+- [ ] Pages rendered in headless Chrome at both widths and the screenshots actually
+      reviewed, with no console errors or failed requests during the run
+- [ ] Rendered again against the live URL after deploy
 - [ ] No new duplication: checked what already exists first
 - [ ] No secrets in the diff, example config updated
 - [ ] Migration reviewed and safe against production data
@@ -587,13 +627,13 @@ rather than to one laptop.
 
 ---
 
-## 23. Adapting this
+## 24. Adapting this
 
 1. Copy `AGENTS.md` into the new repo and symlink `CLAUDE.md` to it.
 2. Write `docs/spec.md` before writing code.
 3. Drop the sections that genuinely do not apply. A CLI has no responsive gate; an
    internal tool has no discovery surfaces.
-4. Keep sections 1, 2, 3, 6, 7, 9, 19, and 22 regardless of what you are building. Those are
+4. Keep sections 1, 2, 3, 6, 7, 9, 20, and 23 regardless of what you are building. Those are
    the ones that stop a project from rotting.
 5. Add project-specific rules to `docs/spec.md`, not here. This file is what is true
    across your projects; the spec is what is true about this one.
