@@ -44,18 +44,27 @@ app-specific rules in `apps/<app>/AGENTS.md` rather than editing the root file.
 - **One component library.** shadcn in a shared `@scope/ui`, the rule of three for
   extraction, and one stack each for forms and data fetching.
 - **Responsive and accessible as a gate.** 320px, hostile content, axe in E2E.
-- **Copy quality.** Every user-visible string through `no-ai-slop`. No em dashes.
+- **Copy quality.** Every user-visible string through `no-ai-slop`, plus an AST-based
+  test that walks every string literal and JSX text node and fails the build on em dashes
+  and a banned word list.
 - **Database.** Migrations only, two-step destructive changes, transactional audit rows.
 - **Security.** Explicit authorization per route proven by tests, output shaping, secret
   handling, rate limits, headers.
-- **Observability.** Structured logs, request IDs, a health endpoint the smoke test reads.
+- **Observability and backups.** Structured logs, request IDs, a health endpoint the
+  smoke test reads, and backups that are off-host, checksummed, copied to a second
+  provider, and restore-drilled on a schedule.
 - **Discovery surfaces.** `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt`,
   feeds, manifest, metadata, and JSON-LD, all generated from live content, all tested to
   prove drafts and private records never leak into an index.
 - **Git hooks.** Fast pre-commit, commitlint, and a pre-push that runs the same gates CI
   runs, from the same script definitions.
+- **CI and infrastructure.** SHA-pinned actions, least-privilege token permissions,
+  serialized production jobs, and the whole deploy topology committed under `deploy/`.
 - **Docs that stay true.** A small fixed set: architecture, data model, runbook,
   onboarding, security, testing, and decision records.
+- **Agent configuration in the repo.** `AGENTS.md` canonical with `CLAUDE.md` as a
+  symlink, a committed permission allowlist, and repeated procedures turned into reviewed
+  skills instead of pasted prompts.
 - **A Definition of Done checklist** you can paste into a pull request template.
 
 ## Why

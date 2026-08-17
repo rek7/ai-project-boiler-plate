@@ -315,7 +315,21 @@ machine-readable endpoints.
   never compress away a limit, condition, or required instruction.
 - Error messages say what happened and what the reader can do next. "Something went
   wrong" is not an error message.
-- Keep copy regression tests current when wording changes.
+
+Mechanize it. A style rule nobody can check is a style rule that decays, so
+`__tests__/unit/copy-style.test.ts` parses every `.ts` and `.tsx` file in the app with the
+TypeScript compiler API, visits every string literal, template part, and JSX text node,
+and fails on:
+
+- em dashes and their HTML entities (`—`, `&mdash;`, `&#8212;`, `&#x2014;`)
+- a banned word list: delve, foster, leverage, utilize, facilitate, empower, streamline,
+  robust, cutting-edge, paradigm shift, game changer, tapestry, realm, beacon,
+  multifaceted, meticulous, intricate, paramount, transformative, elevate, embark,
+  supercharge, harness, ever-evolving, seamless, unlock, unleash, dive into, navigate the
+
+Walk the AST rather than grepping the file, so a banned word in a variable name or a code
+comment does not fail the build while one in user-facing copy does. Extend the list when
+review catches a new tic. Keep copy regression tests current when wording changes.
 
 ---
 
@@ -389,6 +403,20 @@ machine-readable endpoints.
   alerts when the queue stops draining.
 - Alerts are actionable. An alert nobody acts on gets deleted, not muted.
 
+**Backups.** An untested backup is a guess.
+
+- Automated, scheduled, and off the machine that holds the primary. A snapshot on the
+  same host survives a bad migration and nothing else.
+- Checksummed on write and verified on read. A silently truncated dump is the normal
+  failure, not a dramatic one.
+- Copied to a second provider. One vendor account is one billing dispute away from zero.
+- Restore drill on a schedule, into a scratch environment, from the real artifact, with
+  the elapsed time written down. That number is your actual recovery time objective, and
+  the first drill is always slower than anyone guessed.
+- The backup job alerts on failure and on silence. A job that stops running quietly is
+  the common case, so alert on a missing success, not only on a reported error.
+- The restore procedure lives in `docs/runbook.md`, written by whoever ran the last drill.
+
 ---
 
 ## 13. Discovery surfaces
@@ -430,7 +458,7 @@ Rules:
   queries content.
 - When you add, remove, rename, or materially change a public page or a machine-readable
   endpoint, update the inventory module and its tests in the same change. This is a
-  checklist item in section 19, not an optional cleanup pass.
+  checklist item in section 20, not an optional cleanup pass.
 
 ---
 
@@ -520,12 +548,45 @@ breaks types in another. If the push touches migrations, also run `pnpm test:int
   you cannot actually do.
 - Never commit `.env`, credentials, keys, dumps, or generated build output.
 - CI runs, on every pull request: lint, typecheck, unit, integration, `openapi:check`,
-  build, and E2E. All required to merge.
+  build, secret scan, dependency audit, and E2E. All required to merge.
+- CI calls the same `package.json` scripts the hooks call. If a command exists in a
+  workflow file and nowhere else, it will break and nobody will notice until it matters.
+- Pin every GitHub Action to a full commit SHA with the version in a trailing comment
+  (`uses: actions/checkout@11d5960a... # v4`). A tag is mutable and a compromised action
+  runs with your credentials.
+- Set `permissions:` explicitly at the workflow level, starting from `contents: read`.
+  The default token is far broader than any job needs.
+- Use a `concurrency` group for production jobs so two deploys cannot interleave, with
+  `cancel-in-progress: false` for anything that touches a database.
 - Untrusted pull request code never runs on a self-hosted runner that holds production
   credentials. Fork PRs run on ephemeral hosted runners or not at all.
 - Deploys run migrations first, then release, then smoke tests, then keep the previous
   release warm for rollback. A failing smoke test rolls back automatically.
 - Every deploy is traceable to a commit SHA, and the SHA is served by `/api/health`.
+
+**Infrastructure lives in the repo.** Reproducing an environment from memory is how
+environments diverge.
+
+```
+deploy/<target>/
+  docker-compose.yml      the production topology
+  Caddyfile               or nginx.conf, the edge config
+  release.sh              build, transfer, migrate, restart, health check
+  backup.service          plus backup.timer, the scheduled job units
+  stack.env.example       every key present, every value blank
+  README.md              first-time setup and verification steps
+docker-compose.dev.yml    local dependencies
+docker-compose.test.yml   integration test dependencies
+```
+
+Secrets stay on the host in a `0600` file and never enter Git or CI configuration. Local,
+test, and production run the same images from the same compose definitions with different
+env files, so "works on my machine" stops being a category of bug.
+
+**One-off scripts are code.** Backfills, migrations, and seeds go in `scripts/`, get
+committed, get reviewed, and get a dry-run flag. The one you ran by hand from a terminal
+is the one nobody can audit six months later when the data looks wrong. Seeds are
+idempotent; backfills are resumable and log what they changed.
 
 ---
 
@@ -567,7 +628,37 @@ docs/
 
 ---
 
-## 19. Definition of Done
+## 19. Agent configuration lives in the repo
+
+The rules only work if every agent reads them, and the tooling around them is part of the
+project, not part of one person's laptop.
+
+```
+AGENTS.md                     canonical standards, this file
+CLAUDE.md                     symlink to AGENTS.md
+apps/<app>/AGENTS.md          app-specific rules that extend the root file
+.claude/settings.json         committed: permission allowlist, hooks, env
+.claude/settings.local.json   gitignored: personal overrides
+.claude/commands/             repeatable prompts as slash commands
+.agents/skills/<name>/        repo-local skills, committed and reviewed
+```
+
+- Commit `.claude/settings.json` with the permission allowlist for the safe read-only
+  commands this repo uses. Everyone gets fewer prompts, and the list is reviewable. Keep
+  personal overrides in `settings.local.json` and gitignore it.
+- A procedure an agent performs more than twice becomes a committed skill or slash
+  command. A prompt pasted from a notes app is not a process.
+- Skills are reviewed like code. One with a destructive step needs a dry-run mode and an
+  explicit confirmation, the same as any script in `scripts/`.
+- Instruction files are load-bearing, so keep them honest: when a rule stops matching
+  reality, fix the rule in the same change. A stale `AGENTS.md` produces confidently
+  wrong work at scale, which is worse than no instructions.
+- One canonical file, one symlink, no third copy. Duplicated instruction files drift, and
+  agents then follow whichever one is wrong.
+
+---
+
+## 20. Definition of Done
 
 A change is done when all of these are true:
 
@@ -592,14 +683,14 @@ A change is done when all of these are true:
 
 ---
 
-## 20. Starting a new project from this
+## 21. Starting a new project from this
 
 1. Copy `AGENTS.md` and `README.md` into the new repo. Recreate `CLAUDE.md` as a symlink
    to `AGENTS.md` (`ln -s AGENTS.md CLAUDE.md`).
 2. Replace `<project>` and `@scope`.
 3. Delete the sections the project genuinely does not have. A CLI tool has no responsive
    gate. A private internal tool has no discovery surfaces.
-4. Keep sections 1, 3, 4, 6, 16, and 19 regardless of what you are building. Those are
+4. Keep sections 1, 3, 4, 6, 16, and 20 regardless of what you are building. Those are
    the ones that stop the project from rotting.
 5. Add app-specific rules in `apps/<app>/AGENTS.md`, not here.
 
